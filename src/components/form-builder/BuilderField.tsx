@@ -233,6 +233,7 @@ interface BuilderFieldProps {
   field: FormFieldInternal;
   onUpdate: (id: string, updates: Partial<FormFieldInternal>) => void;
   onDelete: (id: string) => void;
+  hasError?: boolean;
 }
 
 // ============================================================================
@@ -265,7 +266,7 @@ const handleNonNegativeInput = (value: string): number | undefined => {
 // BUILDER FIELD COMPONENT
 // ============================================================================
 
-export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onDelete }) => {
+export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onDelete, hasError }) => {
   const config = getFieldConfig(field.type);
 
   // ----------------------------------------
@@ -589,7 +590,7 @@ export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onD
   // ============================================================================
 
   return (
-    <Card className="mb-4 relative group border-l-4 border-l-blue-500">
+    <Card className={`mb-4 relative group border-l-4 ${hasError ? 'border-l-red-500 ring-2 ring-red-200' : 'border-l-blue-500'}`}>
       <Button
         variant="ghost"
         size="icon"
@@ -611,12 +612,16 @@ export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onD
         {/* Main Properties Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Label</Label>
+            <Label className={hasError ? 'text-red-500' : ''}>Label {hasError && <span className="text-red-500">*</span>}</Label>
             <Input
               value={field.label}
               onChange={(e) => onUpdate(field.id, { label: e.target.value })}
               placeholder="Field Label"
+              className={hasError ? 'border-red-500 focus-visible:ring-red-500' : ''}
             />
+            {hasError && (
+              <p className="text-xs text-red-500">Label is required</p>
+            )}
           </div>
 
           {config.hasPlaceholder && (

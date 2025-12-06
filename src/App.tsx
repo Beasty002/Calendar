@@ -4,10 +4,12 @@ import FormBuilder from './components/form-builder'
 import { FormBuilder as FormBuilderEditor } from './components/form-builder/FormBuilder'
 import { FormViewer } from './components/form-builder/FormViewer'
 import { NavigationButton } from './components/NavigationButton'
+import { Toaster } from 'sonner'
 
 const App = () => {
   return (
     <Router>
+      <Toaster richColors position="top-right" />
       <div className="flex flex-col h-screen">
         <div className="flex-1 overflow-hidden">
           <Routes>

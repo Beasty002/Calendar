@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Save, ArrowLeft } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { saveForm, getForm } from './store';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ export const FormBuilder: React.FC = () => {
   const [formDescription, setFormDescription] = useState("");
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formId, setFormId] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
 
   // Load existing form data if editing
   useEffect(() => {
@@ -44,7 +46,7 @@ export const FormBuilder: React.FC = () => {
     const newField: FormFieldInternal = {
       id: `field_${uuidv4()}`,
       type,
-      label: `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+      label: '',
       placeholder: '',
       required: false,
       options: (type === 'select' || type === 'checklist' || type === 'radio') ? ['Option 1', 'Option 2'] : undefined
@@ -58,9 +60,29 @@ export const FormBuilder: React.FC = () => {
 
   const handleUpdateField = (id: string, updates: Partial<FormFieldInternal>) => {
     setFields(fields.map((field) => (field.id === id ? { ...field, ...updates } : field)));
+    // Clear error for this field if label is being updated with a non-empty value
+    if (updates.label && updates.label.trim()) {
+      setFieldErrors(prev => {
+        const newErrors = new Set(prev);
+        newErrors.delete(id);
+        return newErrors;
+      });
+    }
   };
 
+
   const handleSaveClick = () => {
+    // Validate that all fields have non-empty labels
+    const fieldsWithEmptyLabels = fields.filter(field => !field.label.trim());
+    
+    if (fieldsWithEmptyLabels.length > 0) {
+      // Set the field IDs that have errors
+      setFieldErrors(new Set(fieldsWithEmptyLabels.map(f => f.id)));
+      toast.error(`Please provide labels for all fields. ${fieldsWithEmptyLabels.length} field(s) have empty labels.`);
+      return;
+    }
+    
+    setFieldErrors(new Set());
     setIsPreviewOpen(true);
   };
 
@@ -119,7 +141,8 @@ export const FormBuilder: React.FC = () => {
                 <BuilderCanvas 
                     fields={fields} 
                     onUpdateField={handleUpdateField} 
-                    onDeleteField={handleDeleteField} 
+                    onDeleteField={handleDeleteField}
+                    fieldErrors={fieldErrors}
                 />
             </div>
         </div>
@@ -127,7 +150,7 @@ export const FormBuilder: React.FC = () => {
 
       {/* Preview Modal */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-4xl h-[80vh] flex flex-col p-0 gap-0">
+        <DialogContent className="max-w-4xl h-auto max-h-[95dvh] flex flex-col p-0 gap-0 overflow-hidden" >
           <DialogHeader className="p-6 border-b">
             <DialogTitle>Form Preview</DialogTitle>
             <DialogDescription>
@@ -135,7 +158,7 @@ export const FormBuilder: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto">
              <FormViewer 
                 schema={{
                   id: formId || 'preview',
