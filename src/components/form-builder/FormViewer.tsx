@@ -449,6 +449,22 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
         </div>
       );
       
+    case 'phone':
+        return (
+          <Input 
+            type="tel"
+            placeholder={field.placeholder} 
+            {...formField} 
+            value={formField.value as string ?? ''}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === '' || /^[0-9+\-\s()]*$/.test(val)) {
+                formField.onChange(val);
+              }
+            }}
+          />
+        );
+
     default:
       // Handle number input with optional spinner disable
       if (field.type === 'number') {
@@ -466,7 +482,7 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
       
       return (
         <Input 
-            type={field.type === 'date' ? 'date' : field.type === 'phone' ? 'tel' : 'text'} 
+            type={field.type === 'date' ? 'date' : 'text'} 
             placeholder={field.placeholder} 
             {...formField} 
             value={formField.value as string | number | readonly string[] | undefined ?? ''}
