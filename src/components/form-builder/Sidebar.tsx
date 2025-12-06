@@ -1,16 +1,16 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  Type, 
-  Hash, 
-  Mail, 
+import {
+  Type,
+  Hash,
+  Mail,
   Phone,
-  Calendar, 
-  AlignLeft, 
-  FileUp, 
-  CheckSquare, 
-  List, 
+  Calendar,
+  AlignLeft,
+  FileUp,
+  CheckSquare,
+  List,
   ChevronDown,
   CircleDot,
   Sliders,
@@ -22,52 +22,40 @@ interface SidebarProps {
   onAddField: (type: FieldType) => void;
 }
 
+const FIELD_CONFIG: { type: FieldType; label: string; icon: React.ElementType }[] = [
+  { type: 'text', label: 'Text Input', icon: Type },
+  { type: 'textarea', label: 'Text Area', icon: AlignLeft },
+  { type: 'number', label: 'Number Input', icon: Hash },
+  { type: 'email', label: 'Email Input', icon: Mail },
+  { type: 'phone', label: 'Phone Input', icon: Phone },
+  { type: 'date', label: 'Date Input', icon: Calendar },
+  { type: 'file', label: 'File Upload', icon: FileUp },
+  { type: 'checkbox', label: 'Checkbox', icon: CheckSquare },
+  { type: 'checklist', label: 'Checklist', icon: List },
+  { type: 'radio', label: 'Radio Group', icon: CircleDot },
+  { type: 'select', label: 'Select Dropdown', icon: ChevronDown },
+  { type: 'range', label: 'Range Slider', icon: Sliders },
+  { type: 'min_max', label: 'Min-Max Input', icon: ArrowLeftRight },
+];
+
 export const Sidebar: React.FC<SidebarProps> = ({ onAddField }) => {
   return (
     <Card className="w-64 h-full border-r rounded-none overflow-y-auto">
       <CardHeader>
         <CardTitle className="text-lg">Form Fields</CardTitle>
       </CardHeader>
+
       <CardContent className="flex flex-col gap-2">
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('text')}>
-          <Type size={16} /> Text Input
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('textarea')}>
-          <AlignLeft size={16} /> Text Area
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('number')}>
-          <Hash size={16} /> Number Input
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('email')}>
-          <Mail size={16} /> Email Input
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('phone')}>
-          <Phone size={16} /> Phone Input
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('date')}>
-          <Calendar size={16} /> Date Input
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('file')}>
-          <FileUp size={16} /> File Upload
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('checkbox')}>
-          <CheckSquare size={16} /> Checkbox
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('checklist')}>
-          <List size={16} /> Checklist
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('radio')}>
-          <CircleDot size={16} /> Radio Group
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('select')}>
-          <ChevronDown size={16} /> Select Dropdown
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('range')}>
-          <Sliders size={16} /> Range Slider
-        </Button>
-        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('min_max')}>
-          <ArrowLeftRight size={16} /> Min-Max Input
-        </Button>
+        {FIELD_CONFIG.map(({ type, label, icon: Icon }) => (
+          <Button
+            key={type}
+            variant="outline"
+            className="justify-start gap-2"
+            onClick={() => onAddField(type)}
+          >
+            <Icon size={16} /> {label}
+          </Button>
+        ))}
       </CardContent>
     </Card>
   );
