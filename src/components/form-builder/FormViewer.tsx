@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +13,144 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { getForm } from './store';
-import { slugify } from './utils';
+
+// Build Zod schema dynamically from field configurations
+const buildZodSchema = (fields: FormFieldInternal[]) => {
+  const schemaShape: Record<string, z.ZodTypeAny> = {};
+
+  fields.forEach(field => {
+    const fieldId = field.id;
+    if (!fieldId) return;
+
+    const v = field.validation || {};
+    let fieldSchema: z.ZodTypeAny;
+
+    switch (field.type) {
+      case 'text':
+      case 'textarea': {
+        let strSchema = z.string();
+        if (v.minLength !== undefined && v.minLength >= 0) {
+          strSchema = strSchema.min(v.minLength, `Minimum ${v.minLength} characters required`);
+        }
+        if (v.maxLength !== undefined && v.maxLength >= 0) {
+          strSchema = strSchema.max(v.maxLength, `Maximum ${v.maxLength} characters allowed`);
+        }
+        fieldSchema = field.required 
+          ? strSchema.min(1, v.requiredMessage || 'This field is required')
+          : strSchema.optional().or(z.literal(''));
+        break;
+      }
+
+      case 'email': {
+        const emailSchema = z.string().email(v.patternMessage || 'Invalid email address');
+        fieldSchema = field.required 
+          ? emailSchema.min(1, v.requiredMessage || 'This field is required')
+          : emailSchema.optional().or(z.literal(''));
+        break;
+      }
+
+      case 'phone': {
+        const phoneRegex = /^\+?[0-9\s\-\(\)]{7,20}$/;
+        const phoneSchema = z.string().regex(phoneRegex, v.patternMessage || 'Invalid phone number');
+        fieldSchema = field.required 
+          ? phoneSchema.min(1, v.requiredMessage || 'This field is required')
+          : phoneSchema.optional().or(z.literal(''));
+        break;
+      }
+
+      case 'number': {
+        let numSchema = z.coerce.number();
+        if (v.minValue !== undefined) {
+          numSchema = numSchema.min(v.minValue, `Minimum value is ${v.minValue}`);
+        }
+        if (v.maxValue !== undefined) {
+          numSchema = numSchema.max(v.maxValue, `Maximum value is ${v.maxValue}`);
+        }
+        fieldSchema = field.required 
+          ? numSchema
+          : z.union([numSchema, z.literal('')]);
+        break;
+      }
+
+      case 'date': {
+        let dateSchema = z.string();
+        if (v.minDate) {
+          dateSchema = dateSchema.refine(
+            (val) => !val || val >= v.minDate!,
+            `Date must be on or after ${v.minDate}`
+          );
+        }
+        if (v.maxDate) {
+          dateSchema = dateSchema.refine(
+            (val) => !val || val <= v.maxDate!,
+            `Date must be on or before ${v.maxDate}`
+          );
+        }
+        fieldSchema = field.required 
+          ? dateSchema.min(1, v.requiredMessage || 'This field is required')
+          : dateSchema.optional().or(z.literal(''));
+        break;
+      }
+
+      case 'checkbox': {
+        const requiredMsg = v.requiredMessage || 'Required';
+        fieldSchema = field.required 
+          ? z.boolean().refine(val => val === true, { message: requiredMsg })
+          : z.boolean();
+        break;
+      }
+
+      case 'checklist': {
+        let arrSchema = z.array(z.string());
+        const minSel = v.minSelections ?? (field.required ? 1 : 0);
+        if (minSel > 0) {
+          arrSchema = arrSchema.min(minSel, v.requiredMessage || `Select at least ${minSel} option(s)`);
+        }
+        if (v.maxSelections !== undefined) {
+          arrSchema = arrSchema.max(v.maxSelections, `Select at most ${v.maxSelections} option(s)`);
+        }
+        fieldSchema = arrSchema;
+        break;
+      }
+
+      case 'radio':
+      case 'select': {
+        const selectSchema = z.string();
+        fieldSchema = field.required 
+          ? selectSchema.min(1, v.requiredMessage || 'Please select an option')
+          : selectSchema.optional().or(z.literal(''));
+        break;
+      }
+
+      case 'range': {
+        fieldSchema = z.number();
+        break;
+      }
+
+      case 'min_max': {
+        fieldSchema = z.object({
+          min: z.string(),
+          max: z.string()
+        });
+        break;
+      }
+
+      case 'file': {
+        // File validation is handled separately via custom validation
+        // because Zod doesn't natively support FileList
+        fieldSchema = z.any();
+        break;
+      }
+
+      default:
+        fieldSchema = z.any();
+    }
+
+    schemaShape[fieldId] = fieldSchema;
+  });
+
+  return z.object(schemaShape);
+};
 
 interface FormViewerProps {
   schema?: FormSchema; 
@@ -155,7 +294,8 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
             </p>
             <p className="text-xs text-gray-500 mt-1">
               {field.acceptedFileTypes?.length ? field.acceptedFileTypes.join(', ') : 'Any file'} 
-              {field.maxFiles ? ` (Max ${field.maxFiles} ${field.maxFiles === 1 ? 'file' : 'files'})` : ''}
+              {field.maxFiles ? ` • Max ${field.maxFiles} ${field.maxFiles === 1 ? 'file' : 'files'}` : ''}
+              {field.validation?.maxFileSize ? ` • Max ${field.validation.maxFileSize >= 1024 ? `${(field.validation.maxFileSize / 1024).toFixed(1)} MB` : `${field.validation.maxFileSize} KB`} per file` : ''}
             </p>
             <Input 
                 id={`file-input-${field.id}`}
@@ -310,9 +450,23 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
       );
       
     default:
+      // Handle number input with optional spinner disable
+      if (field.type === 'number') {
+        return (
+          <Input 
+            type="number"
+            placeholder={field.placeholder} 
+            {...formField} 
+            value={formField.value as string | number | readonly string[] | undefined ?? ''}
+            className={field.disableSpinners ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}
+            onWheel={field.disableSpinners ? (e) => (e.target as HTMLInputElement).blur() : undefined}
+          />
+        );
+      }
+      
       return (
         <Input 
-            type={field.type === 'date' ? 'date' : field.type === 'number' ? 'number' : 'text'} 
+            type={field.type === 'date' ? 'date' : field.type === 'phone' ? 'tel' : 'text'} 
             placeholder={field.placeholder} 
             {...formField} 
             value={formField.value as string | number | readonly string[] | undefined ?? ''}
@@ -365,7 +519,11 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
     return values;
   }, [fields]);
 
+  // Build Zod schema from field configurations
+  const zodSchema = useMemo(() => buildZodSchema(fields), [fields]);
+
   const form = useForm({
+    resolver: zodResolver(zodSchema),
     defaultValues,
     mode: "onChange"
   });
@@ -376,31 +534,40 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
   }, [defaultValues, form]);
 
   const handleFormSubmit = (data: any) => {
-    // Transform data to use slugified labels as keys
-    const labelBasedData: Record<string, any> = {};
-    
-    fields.forEach(field => {
+    // Build payload with form schema and field values
+    const fieldsWithValues = fields.map(field => {
       const fieldId = field.id || (field as any).id;
-      if (fieldId && data[fieldId] !== undefined) {
-        const slugifiedLabel = slugify(field.label);
-        let value = data[fieldId];
-        
-        // Slugify option values for select, radio, and checklist
-        if (field.type === 'select' || field.type === 'radio') {
-          value = typeof value === 'string' ? slugify(value) : value;
-        } else if (field.type === 'checklist' && Array.isArray(value)) {
-          value = value.map(v => slugify(v));
-        }
-        
-        labelBasedData[slugifiedLabel] = value;
+      let value = fieldId ? data[fieldId] : undefined;
+      
+      // Handle file type - convert FileList to file info array
+      if (field.type === 'file' && value instanceof FileList) {
+        value = Array.from(value).map(file => ({
+          name: file.name,
+          size: file.size,
+          type: file.type
+        }));
       }
+      
+      // Return field with value
+      return {
+        ...field,
+        value: value
+      };
     });
 
-    console.log("Form Submitted:", labelBasedData);
+    const payload = {
+      id: activeSchema?.id || 'form_submission',
+      name: formTitle,
+      description: formDescription,
+      fields: fieldsWithValues,
+      submittedAt: new Date().toISOString()
+    };
+
+    console.log("Form Submitted:", payload);
     if (onSubmit) {
-        onSubmit(labelBasedData);
+        onSubmit(payload);
     } else {
-        alert("Form submitted successfully!\n" + JSON.stringify(labelBasedData, null, 2));
+        alert("Form submitted successfully!\n" + JSON.stringify(payload, null, 2));
     }
   };
 
@@ -475,46 +642,37 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
                  const fieldId = (field as any).id;
                  if (!fieldId) return null;
 
-                 // Generate validation rules
-                 const rules: any = {};
-                 
-                 if (field.required) {
-                    if (field.type === 'checkbox') {
-                        rules.required = "Required";
-                        rules.validate = (val: boolean) => val === true || "Required";
-                    } else if (field.type === 'checklist') {
-                        rules.required = "Select at least one option";
-                        rules.validate = (val: string[]) => val && val.length > 0 || "Select at least one option";
-                    } else if (field.type === 'file') {
-                         rules.required = "This field is required";
-                         rules.validate = (val: FileList) => val && val.length > 0 || "This field is required";
-                    } else {
-                        rules.required = "This field is required";
-                    }
-                 }
-
-                 if (field.type === 'email') {
-                     rules.pattern = {
-                         value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                         message: "Invalid email address"
-                     };
-                 }
-                 
-                 if (field.type === 'number') {
-                     rules.validate = (val: string) => !isNaN(Number(val)) || "Must be a number";
-                 }
-
-                 // File upload validation for maxFiles
-                 if (field.type === 'file' && field.maxFiles) {
-                     const existingValidate = rules.validate;
-                     rules.validate = (val: FileList) => {
-                         if (!val || val.length === 0) {
-                             return field.required ? "This field is required" : true;
+                 // File validation rules (Zod doesn't handle FileList natively)
+                 const fileRules: any = {};
+                 if (field.type === 'file') {
+                     const v = field.validation || {};
+                     const requiredMsg = v.requiredMessage || "This field is required";
+                     const validators: ((val: FileList) => true | string)[] = [];
+                     
+                     if (field.maxFiles) {
+                       validators.push((val: FileList) => (!val || val.length <= field.maxFiles!) || `Maximum ${field.maxFiles} file(s) allowed`);
+                     }
+                     if (v.maxFileSize) {
+                       validators.push((val: FileList) => {
+                         if (!val || val.length === 0) return true;
+                         for (let i = 0; i < val.length; i++) {
+                           if (val[i].size > v.maxFileSize! * 1024) {
+                             return `File "${val[i].name}" exceeds ${v.maxFileSize} KB limit`;
+                           }
                          }
-                         if (field.maxFiles && val.length > field.maxFiles) {
-                             return `Maximum ${field.maxFiles} file(s) allowed`;
-                         }
-                         return existingValidate ? existingValidate(val) : true;
+                         return true;
+                       });
+                     }
+                     
+                     fileRules.validate = (val: FileList) => {
+                       if (!val || val.length === 0) {
+                         return field.required ? requiredMsg : true;
+                       }
+                       for (const validator of validators) {
+                         const result = validator(val);
+                         if (result !== true) return result;
+                       }
+                       return true;
                      };
                  }
 
@@ -523,9 +681,14 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
                     key={fieldId}
                     control={form.control}
                     name={fieldId}
-                    rules={rules}
+                    rules={field.type === 'file' ? fileRules : undefined}
                     render={({ field: formField }) => (
-                      <FormItem className={field.type === 'checkbox' ? 'flex flex-row items-start space-x-3 space-y-0 p-4 border rounded-md' : ''}>
+                      <FormItem className={field.type === 'checkbox' ? 'flex flex-col space-y-2 p-4 border rounded-md' : ''}>
+                        {field.type === 'checkbox' && (
+                          <div className="flex flex-row items-start space-x-3">
+                            <RenderField field={field} formField={formField} />
+                          </div>
+                        )}
                         {field.type !== 'checkbox' && (
                             <div className="flex items-center gap-2">
                                 <FormLabel className="text-base">{field.label} {field.required && <span className="text-red-500">*</span>}</FormLabel>
@@ -544,10 +707,12 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
                             </div>
                         )}
                         
-                        <FormControl>
-                          <RenderField field={field} formField={formField} />
-                        </FormControl>
-                        {field.type !== 'checkbox' && <FormMessage />}
+                        {field.type !== 'checkbox' && (
+                          <FormControl>
+                            <RenderField field={field} formField={formField} />
+                          </FormControl>
+                        )}
+                        <FormMessage />
                       </FormItem>
                     )}
                   />

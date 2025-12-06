@@ -15,6 +15,23 @@ interface BuilderFieldProps {
   onDelete: (id: string) => void;
 }
 
+// Helper to check if validation section should be shown
+const hasValidationOptions = (field: FormFieldInternal): boolean => {
+  // Text-based fields have length validation
+  if (['text', 'textarea'].includes(field.type)) return true;
+  // Number has min/max value
+  if (field.type === 'number') return true;
+  // Date has min/max date
+  if (field.type === 'date') return true;
+  // Checklist has selection count
+  if (field.type === 'checklist') return true;
+  // File has max size
+  if (field.type === 'file') return true;
+  // Required fields can have custom message
+  if (field.required) return true;
+  return false;
+};
+
 export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onDelete }) => {
   const handleOptionAdd = () => {
     const currentOptions = field.options || [];
@@ -31,6 +48,13 @@ export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onD
   const handleOptionRemove = (index: number) => {
     const currentOptions = field.options || [];
     onUpdate(field.id, { options: currentOptions.filter((_, i) => i !== index) });
+  };
+
+  // Helper to handle non-negative number input
+  const handleNonNegativeInput = (value: string): number | undefined => {
+    if (!value) return undefined;
+    const num = parseInt(value);
+    return num >= 0 ? num : 0;
   };
 
   return (
@@ -64,7 +88,7 @@ export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onD
                 />
             </div>
             
-            {(field.type === 'text' || field.type === 'textarea' || field.type === 'email' || field.type === 'number') && (
+            {(field.type === 'text' || field.type === 'textarea' || field.type === 'email' || field.type === 'number' || field.type === 'phone') && (
                 <div className="space-y-2">
                     <Label>Placeholder</Label>
                     <Input 
@@ -243,7 +267,211 @@ export const BuilderField: React.FC<BuilderFieldProps> = ({ field, onUpdate, onD
                 </div>
             </div>
         )}
+
+        {/* Validation Configuration Section - Only shown when there are validation options */}
+        {hasValidationOptions(field) && (
+          <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-md space-y-4">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">Validation Rules</Label>
+            
+            {/* String Length Validation - only for text, textarea */}
+            {(field.type === 'text' || field.type === 'textarea') && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Min Length</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    value={field.validation?.minLength ?? ''}
+                    onChange={(e) => {
+                      const val = handleNonNegativeInput(e.target.value);
+                      onUpdate(field.id, { 
+                        validation: { ...field.validation, minLength: val } 
+                      });
+                    }}
+                    placeholder="No min"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max Length</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    value={field.validation?.maxLength ?? ''}
+                    onChange={(e) => {
+                      const val = handleNonNegativeInput(e.target.value);
+                      onUpdate(field.id, { 
+                        validation: { ...field.validation, maxLength: val } 
+                      });
+                    }}
+                    placeholder="No max"
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Date Range Validation */}
+            {field.type === 'date' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Min Date</Label>
+                  <Input 
+                    type="date"
+                    value={field.validation?.minDate ?? ''}
+                    onChange={(e) => {
+                      onUpdate(field.id, { 
+                        validation: { ...field.validation, minDate: e.target.value || undefined } 
+                      });
+                    }}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max Date</Label>
+                  <Input 
+                    type="date"
+                    value={field.validation?.maxDate ?? ''}
+                    onChange={(e) => {
+                      onUpdate(field.id, { 
+                        validation: { ...field.validation, maxDate: e.target.value || undefined } 
+                      });
+                    }}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Number Range Validation */}
+            {field.type === 'number' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Min Value</Label>
+                    <Input 
+                      type="number"
+                      value={field.validation?.minValue ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                        onUpdate(field.id, { 
+                          validation: { ...field.validation, minValue: val } 
+                        });
+                      }}
+                      placeholder="No min"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Max Value</Label>
+                    <Input 
+                      type="number"
+                      value={field.validation?.maxValue ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value ? parseFloat(e.target.value) : undefined;
+                        onUpdate(field.id, { 
+                          validation: { ...field.validation, maxValue: val } 
+                        });
+                      }}
+                      placeholder="No max"
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`disable-spinners-${field.id}`}
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                    checked={field.disableSpinners ?? false}
+                    onChange={(e) => {
+                      onUpdate(field.id, { disableSpinners: e.target.checked });
+                    }}
+                  />
+                  <label htmlFor={`disable-spinners-${field.id}`} className="text-xs cursor-pointer">
+                    Disable scroll &amp; increment/decrement buttons
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Selection Count Validation - for checklist */}
+            {field.type === 'checklist' && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Min Selections</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    value={field.validation?.minSelections ?? ''}
+                    onChange={(e) => {
+                      const val = handleNonNegativeInput(e.target.value);
+                      onUpdate(field.id, { 
+                        validation: { ...field.validation, minSelections: val } 
+                      });
+                    }}
+                    placeholder="No min"
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Max Selections</Label>
+                  <Input 
+                    type="number"
+                    min="0"
+                    value={field.validation?.maxSelections ?? ''}
+                    onChange={(e) => {
+                      const val = handleNonNegativeInput(e.target.value);
+                      onUpdate(field.id, { 
+                        validation: { ...field.validation, maxSelections: val } 
+                      });
+                    }}
+                    placeholder="No max"
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* File Size Validation - per file */}
+            {field.type === 'file' && (
+              <div className="space-y-1">
+                <Label className="text-xs">Max File Size per File (KB)</Label>
+                <Input 
+                  type="number"
+                  min="1"
+                  value={field.validation?.maxFileSize ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? Math.max(1, parseInt(e.target.value)) : undefined;
+                    onUpdate(field.id, { 
+                      validation: { ...field.validation, maxFileSize: val } 
+                    });
+                  }}
+                  placeholder="No limit"
+                  className="h-8 text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Applied to each individual file</p>
+              </div>
+            )}
+
+            {/* Custom Required Message - for all required fields */}
+            {field.required && (
+              <div className="space-y-1">
+                <Label className="text-xs">Custom Required Message</Label>
+                <Input 
+                  value={field.validation?.requiredMessage ?? ''}
+                  onChange={(e) => onUpdate(field.id, { 
+                    validation: { ...field.validation, requiredMessage: e.target.value || undefined } 
+                  })}
+                  placeholder="This field is required"
+                  className="h-8 text-sm"
+                />
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
 };
+

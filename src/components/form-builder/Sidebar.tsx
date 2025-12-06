@@ -5,6 +5,7 @@ import {
   Type, 
   Hash, 
   Mail, 
+  Phone,
   Calendar, 
   AlignLeft, 
   FileUp, 
@@ -39,6 +40,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onAddField }) => {
         </Button>
         <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('email')}>
           <Mail size={16} /> Email Input
+        </Button>
+        <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('phone')}>
+          <Phone size={16} /> Phone Input
         </Button>
         <Button variant="outline" className="justify-start gap-2" onClick={() => onAddField('date')}>
           <Calendar size={16} /> Date Input

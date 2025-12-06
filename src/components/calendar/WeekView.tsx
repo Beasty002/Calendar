@@ -35,6 +35,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
     const days = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
 
     const hours = Array.from({ length: 24 }).map((_, i) => i);
+    
 
 
 
@@ -85,7 +86,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
 
                         {/* Vertical Day Columns & Events */}
                         <div className="absolute inset-0 grid grid-cols-7 h-[1440px]">
-                            {days.map((day, dayIndex) => {
+                            {days.map((day) => {
                                 const dayEvents = events.filter((event) => isSameDay(event.date, day));
                                 
                                 // Sort and position events for this day
@@ -95,7 +96,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                                 const eventsByTime: Record<string, typeof sortedEvents> = {};
                                 sortedEvents.forEach(event => {
                                     if (!eventsByTime[event.startTime]) eventsByTime[event.startTime] = [];
-                                    eventsByTime[event.startTime].push(event);
+                                    eventsByTime[event.startTime].push(event);                                    
                                 });
 
                                 return (
@@ -126,7 +127,7 @@ export const WeekView: React.FC<WeekViewProps> = ({
                                                         const [h, m] = event.startTime.split(":").map(Number);
                                                         const startMin = h * 60 + m;
                                                         const top = (startMin / 60) * 60; // 60px per hour
-                                                        const height = (SLOT_DURATION / 60) * 60;
+                                                        const height = SLOT_DURATION;
                                                         const left = `${index * widthPercent}%`;
                                                         const width = `${widthPercent}%`;
 
