@@ -10,7 +10,7 @@ export const NavigationButton: React.FC = () => {
 
   const toggleView = () => {
     if (isCalendar) {
-      navigate('/form-builder');
+      navigate('/checklist-builder');
     } else {
       navigate('/');
     }

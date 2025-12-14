@@ -1,8 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { Calendar } from './components/calendar'
-import FormBuilder from './components/form-builder'
-import { FormBuilder as FormBuilderEditor } from './components/form-builder/FormBuilder'
-import { FormViewer } from './components/form-builder/FormViewer'
+import ChecklistBuilder from './components/checklist-builder'
+import { ChecklistBuilder as ChecklistBuilderEditor } from './components/checklist-builder/ChecklistBuilder'
+import { ChecklistViewer } from './components/checklist-builder/ChecklistRender'
 import { NavigationButton } from './components/NavigationButton'
 import { Toaster } from 'sonner'
 
@@ -14,10 +14,10 @@ const App = () => {
         <div className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/" element={<Calendar />} />
-            <Route path="/form-builder" element={<FormBuilder />} />
-            <Route path="/form-builder/new" element={<FormBuilderEditor />} />
-            <Route path="/form-builder/edit/:id" element={<FormBuilderEditor />} />
-            <Route path="/form-builder/view/:id" element={<FormViewer />} />
+            <Route path="/checklist-builder" element={<ChecklistBuilder />} />
+            <Route path="/checklist-builder/new" element={<ChecklistBuilderEditor />} />
+            <Route path="/checklist-builder/edit/:id" element={<ChecklistBuilderEditor />} />
+            <Route path="/checklist-builder/view/:id" element={<ChecklistViewer />} />
           </Routes>
         </div>
         <NavigationButton />
