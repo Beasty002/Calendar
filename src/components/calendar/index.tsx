@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, addYears, subYears, format } from "date-fns";
 
 import { MonthView } from "./MonthView";

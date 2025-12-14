@@ -9,10 +9,107 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { HelpCircle, Copy, Check, ArrowLeft, CloudUpload } from 'lucide-react';
 import type { FormFieldInternal, FormSchema } from './types';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useFormField } from '@/components/ui/form';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { getForm } from './store';
+import { FileText, FileVideo, Music } from 'lucide-react';
+
+const FilePreviewItem = ({ file, onRemove }: { file: File; onRemove: () => void }) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let url: string | null = null;
+    if (file) {
+      url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    }
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [file]);
+
+  const renderPreview = () => {
+    if (!previewUrl) return null;
+
+    if (file.type.startsWith('image/')) {
+      return (
+        <a href={previewUrl} target="_blank" rel="noreferrer" className="block cursor-zoom-in">
+          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded overflow-hidden flex-shrink-0">
+            <img src={previewUrl} alt={file.name} className="w-full h-full object-cover" />
+          </div>
+        </a>
+      );
+    }
+
+    if (file.type.startsWith('video/')) {
+      return (
+        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+          <FileVideo className="text-blue-500 w-6 h-6" />
+        </div>
+      );
+    }
+
+    if (file.type.startsWith('audio/')) {
+      return (
+        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+          <Music className="text-purple-500 w-6 h-6" />
+        </div>
+      );
+    }
+
+    if (file.type === 'application/pdf') {
+      return (
+        <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+          <FileText className="text-red-500 w-6 h-6" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+        <FileText className="text-gray-400 w-6 h-6" />
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-2 bg-white dark:bg-gray-950 rounded border">
+      {renderPreview()}
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{file.name}</p>
+        <div className='flex items-center justify-between mt-1'>
+          <p className="text-xs text-muted-foreground mr-2">
+            {(file.size / 1024).toFixed(1)} KB
+          </p>
+        </div>
+
+        {/* Inline Players for Media */}
+        {previewUrl && file.type.startsWith('video/') && (
+          <div className='mt-2'>
+            <video src={previewUrl} controls className="w-full max-h-48 rounded" />
+          </div>
+        )}
+        {previewUrl && file.type.startsWith('audio/') && (
+          <div className='mt-2'>
+            <audio src={previewUrl} controls className="w-full" />
+          </div>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        className="flex-shrink-0 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-500 hover:text-red-700 self-start"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+  );
+};
 
 // Build Zod schema dynamically from field configurations
 const buildZodSchema = (fields: FormFieldInternal[]) => {
@@ -35,7 +132,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
         if (v.maxLength !== undefined && v.maxLength >= 0) {
           strSchema = strSchema.max(v.maxLength, `Maximum ${v.maxLength} characters allowed`);
         }
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? strSchema.min(1, v.requiredMessage || 'This field is required')
           : strSchema.optional().or(z.literal(''));
         break;
@@ -43,7 +140,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
 
       case 'email': {
         const emailSchema = z.string().email(v.patternMessage || 'Invalid email address');
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? emailSchema.min(1, v.requiredMessage || 'This field is required')
           : emailSchema.optional().or(z.literal(''));
         break;
@@ -52,7 +149,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
       case 'phone': {
         const phoneRegex = /^\+?[0-9\s\-\(\)]{7,20}$/;
         const phoneSchema = z.string().regex(phoneRegex, v.patternMessage || 'Invalid phone number');
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? phoneSchema.min(1, v.requiredMessage || 'This field is required')
           : phoneSchema.optional().or(z.literal(''));
         break;
@@ -66,7 +163,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
         if (v.maxValue !== undefined) {
           numSchema = numSchema.max(v.maxValue, `Maximum value is ${v.maxValue}`);
         }
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? numSchema
           : z.union([numSchema, z.literal('')]);
         break;
@@ -86,7 +183,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
             `Date must be on or before ${v.maxDate}`
           );
         }
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? dateSchema.min(1, v.requiredMessage || 'This field is required')
           : dateSchema.optional().or(z.literal(''));
         break;
@@ -94,7 +191,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
 
       case 'checkbox': {
         const requiredMsg = v.requiredMessage || 'Required';
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? z.boolean().refine(val => val === true, { message: requiredMsg })
           : z.boolean();
         break;
@@ -116,7 +213,7 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
       case 'radio':
       case 'select': {
         const selectSchema = z.string();
-        fieldSchema = field.required 
+        fieldSchema = field.required
           ? selectSchema.min(1, v.requiredMessage || 'Please select an option')
           : selectSchema.optional().or(z.literal(''));
         break;
@@ -136,9 +233,41 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
       }
 
       case 'file': {
-        // File validation is handled separately via custom validation
-        // because Zod doesn't natively support FileList
-        fieldSchema = z.any();
+        let fileSchema = z.any();
+
+        // Required validation
+        if (field.required) {
+          fileSchema = fileSchema.refine(
+            (val: FileList | null | undefined) => val && val.length > 0,
+            v.requiredMessage || 'This field is required'
+          );
+        }
+
+        // Max files validation
+        if (field.maxFiles) {
+          fileSchema = fileSchema.refine(
+            (val: FileList | null | undefined) => !val || val.length <= field.maxFiles!,
+            `Maximum ${field.maxFiles} file(s) allowed`
+          );
+        }
+
+        // Max file size validation (per file)
+        if (v.maxFileSize) {
+          fileSchema = fileSchema.refine(
+            (val: FileList | null | undefined) => {
+              if (!val || val.length === 0) return true;
+              for (let i = 0; i < val.length; i++) {
+                if (val[i].size > v.maxFileSize! * 1024) {
+                  return false;
+                }
+              }
+              return true;
+            },
+            `File exceeds ${v.maxFileSize} KB limit`
+          );
+        }
+
+        fieldSchema = fileSchema;
         break;
       }
 
@@ -153,97 +282,99 @@ const buildZodSchema = (fields: FormFieldInternal[]) => {
 };
 
 interface FormViewerProps {
-  schema?: FormSchema; 
-  fields?: FormFieldInternal[]; 
+  schema?: FormSchema;
   onSubmit?: (data: any) => void;
 }
 
 const RenderField = ({ field, formField }: { field: FormFieldInternal; formField: any }) => {
+  const { error } = useFormField();
+  const errorClasses = error ? 'border-destructive ring-destructive/20 ring-[3px]' : '';
+
   switch (field.type) {
     case 'textarea':
-      return <Textarea placeholder={field.placeholder} {...formField} value={formField.value as string ?? ''} />;
-      
+      return <Textarea placeholder={field.placeholder} {...formField} value={formField.value as string ?? ''} className={errorClasses} />;
+
     case 'select':
       return (
-        <select 
-            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            {...formField} 
-            value={formField.value as string ?? ''}
+        <select
+          className={`flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${errorClasses}`}
+          {...formField}
+          value={formField.value as string ?? ''}
         >
-            <option value="" disabled>Select an option</option>
-            {field.options?.map((opt, i) => (
-                <option key={i} value={opt}>{opt}</option>
-            ))}
+          <option value="" disabled>Select an option</option>
+          {field.options?.map((opt, i) => (
+            <option key={i} value={opt}>{opt}</option>
+          ))}
         </select>
       );
-      
+
     case 'checkbox':
       return (
         <>
-            <input 
-                type="checkbox" 
-                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
-                checked={!!formField.value}
-                onChange={formField.onChange}
-                onBlur={formField.onBlur}
-                ref={formField.ref}
-            />
-            <div className="space-y-1 leading-none">
-                <FormLabel className="text-base font-normal">{field.label} {field.required && <span className="text-red-500">*</span>}</FormLabel>
-                {field.tooltip && <p className="text-sm text-muted-foreground">{field.tooltip}</p>}
-            </div>
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mt-1"
+            checked={!!formField.value}
+            onChange={formField.onChange}
+            onBlur={formField.onBlur}
+            ref={formField.ref}
+          />
+          <div className="space-y-1 leading-none">
+            <FormLabel className="text-base font-normal">{field.label} {field.required && <span className="text-red-500">*</span>}</FormLabel>
+            {field.tooltip && <p className="text-sm text-muted-foreground">{field.tooltip}</p>}
+          </div>
         </>
       );
-      
+
     case 'checklist':
       return (
-        <div className="space-y-2 border p-4 rounded-md">
-            {field.options?.map((opt, i) => (
-                <div key={i} className="flex items-center space-x-2">
-                    <input 
-                        type="checkbox"
-                        className="h-4 w-4"
-                        value={opt}
-                        checked={(formField.value as string[] || []).includes(opt)}
-                        onChange={(e) => {
-                            const checked = e.target.checked;
-                            const currentVal = (formField.value as string[]) || [];
-                            if (checked) {
-                                formField.onChange([...currentVal, opt]);
-                            } else {
-                                formField.onChange(currentVal.filter(v => v !== opt));
-                            }
-                        }}
-                    />
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{opt}</label>
-                </div>
-            ))}
+        <div className={`space-y-2 border p-4 rounded-md ${errorClasses}`}>
+          {field.options?.map((opt, i) => (
+            <div key={i} className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                value={opt}
+                checked={(formField.value as string[] || []).includes(opt)}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  const currentVal = (formField.value as string[]) || [];
+                  if (checked) {
+                    formField.onChange([...currentVal, opt]);
+                  } else {
+                    formField.onChange(currentVal.filter(v => v !== opt));
+                  }
+                }}
+              />
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{opt}</label>
+            </div>
+          ))}
         </div>
       );
-      
+
     case 'radio':
       return (
-        <div className="space-y-2 border p-4 rounded-md">
-            {field.options?.map((opt, i) => (
-                <div key={i} className="flex items-center space-x-2">
-                    <input 
-                        type="radio"
-                        className="h-4 w-4 text-primary focus:ring-primary"
-                        value={opt}
-                        checked={formField.value === opt}
-                        onChange={() => formField.onChange(opt)}
-                    />
-                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{opt}</label>
-                </div>
-            ))}
+        <div className={`space-y-2 border p-4 rounded-md ${errorClasses}`}>
+          {field.options?.map((opt, i) => (
+            <div key={i} className="flex items-center space-x-2">
+              <input
+                type="radio"
+                className="h-4 w-4 text-primary focus:ring-primary"
+                value={opt}
+                checked={formField.value === opt}
+                onChange={() => formField.onChange(opt)}
+              />
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{opt}</label>
+            </div>
+          ))}
         </div>
       );
-      
+
     case 'file':
       return (
         <div className="space-y-3">
-          <div 
-            className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+          <div
+            className={`border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors ${error ? 'border-destructive' : ''}`}
             onDragOver={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -251,15 +382,44 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
             onDrop={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              
+
               const newFiles = e.dataTransfer.files;
               if (!newFiles || newFiles.length === 0) return;
-              
+
+              const acceptedTypes = field.acceptedFileTypes || [];
+
+              // Helper to check if file is accepted
+              const isFileAccepted = (file: File) => {
+                if (acceptedTypes.length === 0) return true;
+                return acceptedTypes.some(type => {
+                  if (type.endsWith('/*')) {
+                    const mainType = type.split('/')[0];
+                    return file.type.startsWith(mainType + '/');
+                  }
+                  // Handle comma-separated extensions (e.g. ".doc,.docx")
+                  if (type.includes(',')) {
+                    return type.split(',').some(t => file.name.toLowerCase().endsWith(t.trim().toLowerCase()));
+                  }
+                  if (type.startsWith('.')) {
+                    return file.name.toLowerCase().endsWith(type.toLowerCase());
+                  }
+                  return file.type === type;
+                });
+              };
+
+              // Validate accepted types
+              const validFiles = Array.from(newFiles).filter(isFileAccepted);
+
+              if (validFiles.length < newFiles.length) {
+                alert(`Some files were rejected. Accepted types: ${acceptedTypes.join(', ') || 'All'}`);
+                if (validFiles.length === 0) return;
+              }
+
               const existingFiles = formField.value as FileList | null;
               const existingCount = existingFiles ? existingFiles.length : 0;
-              const newCount = newFiles.length;
+              const newCount = validFiles.length;
               const totalCount = existingCount + newCount;
-              
+
               // Check if adding new files would exceed the limit
               if (field.maxFiles && totalCount > field.maxFiles) {
                 const remaining = field.maxFiles - existingCount;
@@ -270,18 +430,18 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
                 }
                 return;
               }
-              
+
               // Accumulate files
               const dt = new DataTransfer();
-              
+
               // Add existing files
               if (existingFiles) {
                 Array.from(existingFiles).forEach(file => dt.items.add(file));
               }
-              
+
               // Add new files
-              Array.from(newFiles).forEach(file => dt.items.add(file));
-              
+              validFiles.forEach(file => dt.items.add(file));
+
               formField.onChange(dt.files);
             }}
             onClick={() => {
@@ -293,108 +453,76 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
               Click to upload or drag and drop
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              {field.acceptedFileTypes?.length ? field.acceptedFileTypes.join(', ') : 'Any file'} 
+              {field.acceptedFileTypes?.length ? field.acceptedFileTypes.join(', ') : 'Any file'}
               {field.maxFiles ? ` • Max ${field.maxFiles} ${field.maxFiles === 1 ? 'file' : 'files'}` : ''}
               {field.validation?.maxFileSize ? ` • Max ${field.validation.maxFileSize >= 1024 ? `${(field.validation.maxFileSize / 1024).toFixed(1)} MB` : `${field.validation.maxFileSize} KB`} per file` : ''}
             </p>
-            <Input 
-                id={`file-input-${field.id}`}
-                type="file" 
-                className="hidden"
-                accept={field.acceptedFileTypes?.join(',')}
-                multiple={field.maxFiles !== 1}
-                value={undefined} 
-                onChange={(e) => {
-                    const newFiles = e.target.files;
-                    if (!newFiles || newFiles.length === 0) return;
-                    
-                    const existingFiles = formField.value as FileList | null;
-                    const existingCount = existingFiles ? existingFiles.length : 0;
-                    const newCount = newFiles.length;
-                    const totalCount = existingCount + newCount;
-                    
-                    // Check if adding new files would exceed the limit
-                    if (field.maxFiles && totalCount > field.maxFiles) {
-                      const remaining = field.maxFiles - existingCount;
-                      if (remaining <= 0) {
-                        alert(`Maximum ${field.maxFiles} file(s) allowed. Please remove existing files before adding new ones.`);
-                      } else {
-                        alert(`You can only add ${remaining} more file(s). Maximum limit is ${field.maxFiles} file(s).`);
-                      }
-                      e.target.value = ''; // Reset input
-                      return;
-                    }
-                    
-                    // Accumulate files
-                    const dt = new DataTransfer();
-                    
-                    // Add existing files
-                    if (existingFiles) {
-                      Array.from(existingFiles).forEach(file => dt.items.add(file));
-                    }
-                    
-                    // Add new files
-                    Array.from(newFiles).forEach(file => dt.items.add(file));
-                    
-                    formField.onChange(dt.files);
-                    e.target.value = ''; // Reset input to allow selecting same file again
-                }}
+            <input
+              id={`file-input-${field.id}`}
+              type="file"
+              className="hidden"
+              accept={field.acceptedFileTypes?.length ? field.acceptedFileTypes.join(',') : undefined}
+              multiple={field.maxFiles !== 1}
+              onChange={(e) => {
+                const newFiles = e.target.files;
+                if (!newFiles || newFiles.length === 0) return;
+
+                const existingFiles = formField.value as FileList | null;
+                const existingCount = existingFiles ? existingFiles.length : 0;
+                const newCount = newFiles.length;
+                const totalCount = existingCount + newCount;
+
+                // Check if adding new files would exceed the limit
+                if (field.maxFiles && totalCount > field.maxFiles) {
+                  const remaining = field.maxFiles - existingCount;
+                  if (remaining <= 0) {
+                    alert(`Maximum ${field.maxFiles} file(s) allowed. Please remove existing files before adding new ones.`);
+                  } else {
+                    alert(`You can only add ${remaining} more file(s). Maximum limit is ${field.maxFiles} file(s).`);
+                  }
+                  e.target.value = ''; // Reset input
+                  return;
+                }
+
+                // Accumulate files
+                const dt = new DataTransfer();
+
+                // Add existing files
+                if (existingFiles) {
+                  Array.from(existingFiles).forEach(file => dt.items.add(file));
+                }
+
+                // Add new files
+                Array.from(newFiles).forEach(file => dt.items.add(file));
+
+                formField.onChange(dt.files);
+                e.target.value = ''; // Reset input to allow selecting same file again
+              }}
             />
           </div>
 
           {formField.value && (formField.value as FileList).length > 0 && (
             <div className="space-y-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-900">
               <p className="text-xs font-semibold text-muted-foreground">Selected Files:</p>
-              {Array.from(formField.value as FileList).map((file, index) => {
-                const isImage = file.type.startsWith('image/');
-                const fileUrl = isImage ? URL.createObjectURL(file) : null;
-                
-                return (
-                  <div key={index} className="flex items-center gap-3 p-2 bg-white dark:bg-gray-950 rounded border">
-                    {/* File Preview/Icon */}
-                    <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded overflow-hidden">
-                      {isImage && fileUrl ? (
-                        <img src={fileUrl} alt={file.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </div>
-                    
-                    {/* File Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{file.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(file.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    
-                    {/* Remove Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const dt = new DataTransfer();
-                        const files = formField.value as FileList;
-                        Array.from(files).forEach((f, i) => {
-                          if (i !== index) dt.items.add(f);
-                        });
-                        formField.onChange(dt.files);
-                      }}
-                      className="flex-shrink-0 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded text-red-500 hover:text-red-700"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
+              {Array.from(formField.value as FileList).map((file, index) => (
+                <FilePreviewItem
+                  key={`${index}-${file.name}`}
+                  file={file}
+                  onRemove={() => {
+                    const dt = new DataTransfer();
+                    const files = formField.value as FileList;
+                    Array.from(files).forEach((f, i) => {
+                      if (i !== index) dt.items.add(f);
+                    });
+                    formField.onChange(dt.files);
+                  }}
+                />
+              ))}
             </div>
           )}
         </div>
       );
-      
+
     case 'range':
       return (
         <div className="space-y-3">
@@ -418,7 +546,7 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
           />
         </div>
       );
-      
+
     case 'min_max':
       return (
         <div className="flex gap-4">
@@ -448,50 +576,50 @@ const RenderField = ({ field, formField }: { field: FormFieldInternal; formField
           </div>
         </div>
       );
-      
+
     case 'phone':
-        return (
-          <Input 
-            type="tel"
-            placeholder={field.placeholder} 
-            {...formField} 
-            value={formField.value as string ?? ''}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val === '' || /^[0-9+\-\s()]*$/.test(val)) {
-                formField.onChange(val);
-              }
-            }}
-          />
-        );
+      return (
+        <Input
+          type="tel"
+          placeholder={field.placeholder}
+          {...formField}
+          value={formField.value as string ?? ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val === '' || /^[0-9+\-\s()]*$/.test(val)) {
+              formField.onChange(val);
+            }
+          }}
+        />
+      );
 
     default:
       // Handle number input with optional spinner disable
       if (field.type === 'number') {
         return (
-          <Input 
+          <Input
             type="number"
-            placeholder={field.placeholder} 
-            {...formField} 
+            placeholder={field.placeholder}
+            {...formField}
             value={formField.value as string | number | readonly string[] | undefined ?? ''}
             className={field.disableSpinners ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''}
             onWheel={field.disableSpinners ? (e) => (e.target as HTMLInputElement).blur() : undefined}
           />
         );
       }
-      
+
       return (
-        <Input 
-            type={field.type === 'date' ? 'date' : 'text'} 
-            placeholder={field.placeholder} 
-            {...formField} 
-            value={formField.value as string | number | readonly string[] | undefined ?? ''}
+        <Input
+          type={field.type === 'date' ? 'date' : 'text'}
+          placeholder={field.placeholder}
+          {...formField}
+          value={formField.value as string | number | readonly string[] | undefined ?? ''}
         />
       );
   }
 };
 
-export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFields, onSubmit }) => {
+export const FormViewer: React.FC<FormViewerProps> = ({ schema, onSubmit }) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loadedSchema, setLoadedSchema] = useState<FormSchema | null>(null);
@@ -507,9 +635,9 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
     }
   }, [id]);
 
-  // Use loaded schema if available, otherwise use props
-  const activeSchema = loadedSchema || schema;
-  const fields = activeSchema?.fields || propFields || [];
+  // Prioritize schema prop (for preview/editing), fall back to loaded schema (for standalone view)
+  const activeSchema = schema || loadedSchema;
+  const fields = activeSchema?.fields || [];
   const formTitle = activeSchema?.name || "Untitled Form";
   const formDescription = activeSchema?.description || "";
 
@@ -517,20 +645,20 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
   const defaultValues: Record<string, any> = useMemo(() => {
     const values: Record<string, any> = {};
     fields.forEach(field => {
-        const fieldId = field.id || (field as any).id;
-        if (!fieldId) return;
-        
-        if (field.type === 'checkbox') {
-            values[fieldId] = false;
-        } else if (field.type === 'checklist') {
-            values[fieldId] = [];
-        } else if (field.type === 'range') {
-            values[fieldId] = field.min ?? 0;
-        } else if (field.type === 'min_max') {
-            values[fieldId] = { min: '', max: '' };
-        } else {
-            values[fieldId] = "";
-        }
+      const fieldId = field.id || (field as any).id;
+      if (!fieldId) return;
+
+      if (field.type === 'checkbox') {
+        values[fieldId] = false;
+      } else if (field.type === 'checklist') {
+        values[fieldId] = [];
+      } else if (field.type === 'range') {
+        values[fieldId] = field.min ?? 0;
+      } else if (field.type === 'min_max') {
+        values[fieldId] = { min: '', max: '' };
+      } else {
+        values[fieldId] = "";
+      }
     });
     return values;
   }, [fields]);
@@ -541,7 +669,7 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
   const form = useForm({
     resolver: zodResolver(zodSchema),
     defaultValues,
-    mode: "onChange"
+    mode: "onSubmit"
   });
 
   // Reset form when fields change (when schema loads)
@@ -554,7 +682,7 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
     const fieldsWithValues = fields.map(field => {
       const fieldId = field.id || (field as any).id;
       let value = fieldId ? data[fieldId] : undefined;
-      
+
       // Handle file type - convert FileList to file info array
       if (field.type === 'file' && value instanceof FileList) {
         value = Array.from(value).map(file => ({
@@ -563,7 +691,7 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
           type: file.type
         }));
       }
-      
+
       // Return field with value
       return {
         ...field,
@@ -581,21 +709,21 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
 
     console.log("Form Submitted:", payload);
     if (onSubmit) {
-        onSubmit(payload);
+      onSubmit(payload);
     } else {
-        alert("Form submitted successfully!\n" + JSON.stringify(payload, null, 2));
+      alert("Form submitted successfully!\n" + JSON.stringify(payload, null, 2));
     }
   };
 
   const handleCopyJson = () => {
     // If schema is provided, copy that. If not, construct it from fields.
     const jsonToCopy = activeSchema ? activeSchema : {
-        id: "generated_id",
-        name: formTitle,
-        description: formDescription,
-        fields: fields.map(({ id, ...rest }: any) => rest) // Strip ID if copying from raw fields
+      id: "generated_id",
+      name: formTitle,
+      description: formDescription,
+      fields: fields.map(({ id, ...rest }: any) => rest) // Strip ID if copying from raw fields
     };
-    
+
     navigator.clipboard.writeText(JSON.stringify(jsonToCopy, null, 2));
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -621,9 +749,9 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
   return (
     <div className="p-8 max-w-4xl mx-auto h-full overflow-y-auto">
       {id && (
-        <Button 
-          variant="ghost" 
-          size="sm" 
+        <Button
+          variant="ghost"
+          size="sm"
           className="mb-4"
           onClick={() => navigate('/form-builder')}
         >
@@ -632,114 +760,114 @@ export const FormViewer: React.FC<FormViewerProps> = ({ schema, fields: propFiel
         </Button>
       )}
       <Card className="w-full shadow-lg relative mb-8">
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="absolute top-4 right-4"
-        onClick={handleCopyJson}
-      >
-        {copied ? <Check size={14} className="mr-2" /> : <Copy size={14} className="mr-2" />}
-        {copied ? "Copied" : "Copy JSON"}
-      </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="absolute top-4 right-4"
+          onClick={handleCopyJson}
+        >
+          {copied ? <Check size={14} className="mr-2" /> : <Copy size={14} className="mr-2" />}
+          {copied ? "Copied" : "Copy JSON"}
+        </Button>
 
-      <CardHeader>
-        <CardTitle className="text-2xl">{formTitle}</CardTitle>
-        {formDescription && <CardDescription>{formDescription}</CardDescription>}
-      </CardHeader>
-      <CardContent>
-        {fields.length === 0 ? (
-          <div className="text-center text-muted-foreground py-10">
-            This form has no fields.
-          </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-              {fields.map((field) => {
-                 const fieldId = (field as any).id;
-                 if (!fieldId) return null;
+        <CardHeader>
+          <CardTitle className="text-2xl">{formTitle}</CardTitle>
+          {formDescription && <CardDescription>{formDescription}</CardDescription>}
+        </CardHeader>
+        <CardContent>
+          {fields.length === 0 ? (
+            <div className="text-center text-muted-foreground py-10">
+              This form has no fields.
+            </div>
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+                {fields.map((field) => {
+                  const fieldId = (field as any).id;
+                  if (!fieldId) return null;
 
-                 // File validation rules (Zod doesn't handle FileList natively)
-                 const fileRules: any = {};
-                 if (field.type === 'file') {
-                     const v = field.validation || {};
-                     const requiredMsg = v.requiredMessage || "This field is required";
-                     const validators: ((val: FileList) => true | string)[] = [];
-                     
-                     if (field.maxFiles) {
-                       validators.push((val: FileList) => (!val || val.length <= field.maxFiles!) || `Maximum ${field.maxFiles} file(s) allowed`);
-                     }
-                     if (v.maxFileSize) {
-                       validators.push((val: FileList) => {
-                         if (!val || val.length === 0) return true;
-                         for (let i = 0; i < val.length; i++) {
-                           if (val[i].size > v.maxFileSize! * 1024) {
-                             return `File "${val[i].name}" exceeds ${v.maxFileSize} KB limit`;
-                           }
-                         }
-                         return true;
-                       });
-                     }
-                     
-                     fileRules.validate = (val: FileList) => {
-                       if (!val || val.length === 0) {
-                         return field.required ? requiredMsg : true;
-                       }
-                       for (const validator of validators) {
-                         const result = validator(val);
-                         if (result !== true) return result;
-                       }
-                       return true;
-                     };
-                 }
+                  // File validation rules (Zod doesn't handle FileList natively)
+                  const fileRules: any = {};
+                  if (field.type === 'file') {
+                    const v = field.validation || {};
+                    const requiredMsg = v.requiredMessage || "This field is required";
+                    const validators: ((val: FileList) => true | string)[] = [];
 
-                 return (
-                <FormField
-                    key={fieldId}
-                    control={form.control}
-                    name={fieldId}
-                    rules={field.type === 'file' ? fileRules : undefined}
-                    render={({ field: formField }) => (
-                      <FormItem className={field.type === 'checkbox' ? 'flex flex-col space-y-2 p-4 border rounded-md' : ''}>
-                        {field.type === 'checkbox' && (
-                          <div className="flex flex-row items-start space-x-3">
-                            <RenderField field={field} formField={formField} />
-                          </div>
-                        )}
-                        {field.type !== 'checkbox' && (
-                            <div className="flex items-center gap-2">
-                                <FormLabel className="text-base">{field.label} {field.required && <span className="text-red-500">*</span>}</FormLabel>
-                                {field.tooltip && (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <HelpCircle size={14} className="text-muted-foreground cursor-help" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>{field.tooltip}</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                )}
+                    if (field.maxFiles) {
+                      validators.push((val: FileList) => (!val || val.length <= field.maxFiles!) || `Maximum ${field.maxFiles} file(s) allowed`);
+                    }
+                    if (v.maxFileSize) {
+                      validators.push((val: FileList) => {
+                        if (!val || val.length === 0) return true;
+                        for (let i = 0; i < val.length; i++) {
+                          if (val[i].size > v.maxFileSize! * 1024) {
+                            return `File "${val[i].name}" exceeds ${v.maxFileSize} KB limit`;
+                          }
+                        }
+                        return true;
+                      });
+                    }
+
+                    fileRules.validate = (val: FileList) => {
+                      if (!val || val.length === 0) {
+                        return field.required ? requiredMsg : true;
+                      }
+                      for (const validator of validators) {
+                        const result = validator(val);
+                        if (result !== true) return result;
+                      }
+                      return true;
+                    };
+                  }
+
+                  return (
+                    <FormField
+                      key={fieldId}
+                      control={form.control}
+                      name={fieldId}
+                      rules={field.type === 'file' ? fileRules : undefined}
+                      render={({ field: formField }) => (
+                        <FormItem className={field.type === 'checkbox' ? 'flex flex-col space-y-2 p-4 border rounded-md' : ''}>
+                          {field.type === 'checkbox' && (
+                            <div className="flex flex-row items-start space-x-3">
+                              <RenderField field={field} formField={formField} />
                             </div>
-                        )}
-                        
-                        {field.type !== 'checkbox' && (
-                          <FormControl>
-                            <RenderField field={field} formField={formField} />
-                          </FormControl>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                 );
-              })}
-              <Button type="submit" className="w-full">Submit</Button>
-            </form>
-          </Form>
-        )}
-      </CardContent>
-    </Card>
+                          )}
+                          {field.type !== 'checkbox' && (
+                            <div className="flex items-center gap-2">
+                              <FormLabel className="text-base">{field.label} {field.required && <span className="text-red-500">*</span>}</FormLabel>
+                              {field.tooltip && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle size={14} className="text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{field.tooltip}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </div>
+                          )}
+
+                          {field.type !== 'checkbox' && (
+                            <FormControl>
+                              <RenderField field={field} formField={formField} />
+                            </FormControl>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  );
+                })}
+                <Button type="submit" className="w-full">Submit</Button>
+              </form>
+            </Form>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

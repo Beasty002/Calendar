@@ -218,6 +218,8 @@ const FIELD_CONFIG: Record<FieldType, FieldConfig> = {
 // File type options for file upload fields
 const FILE_TYPE_OPTIONS = [
   { label: 'Images (jpg, png, gif)', value: 'image/*' },
+  { label: 'Video (mp4, webm)', value: 'video/*' },
+  { label: 'Audio (mp3, wav)', value: 'audio/*' },
   { label: 'PDF (.pdf)', value: '.pdf' },
   { label: 'Word (.doc, .docx)', value: '.doc,.docx' },
   { label: 'Excel (.xls, .xlsx)', value: '.xls,.xlsx' },

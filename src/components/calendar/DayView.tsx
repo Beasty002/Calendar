@@ -21,7 +21,6 @@ const HOUR_HEIGHT = 60; // px per hour
 export const DayView: React.FC<DayViewProps> = ({
     currentDate,
     events,
-    setEvents,
     onDateClick,
     onEventClick,
 }) => {

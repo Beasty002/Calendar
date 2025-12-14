@@ -22,12 +22,9 @@ interface WeekViewProps {
     onEventClick?: (event: CalendarEvent) => void;
 }
 
-const HOUR_HEIGHT = 60; // px per hour
-
 export const WeekView: React.FC<WeekViewProps> = ({
     currentDate,
     events,
-    setEvents,
     onDateClick,
     onEventClick,
 }) => {

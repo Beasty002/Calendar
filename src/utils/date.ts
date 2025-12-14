@@ -4,9 +4,6 @@ import {
   startOfWeek,
   endOfWeek,
   addDays,
-  isSameMonth,
-  isSameDay,
-  format,
 } from "date-fns";
 
 export function getMonthMatrix(currentDate: Date): Date[][] {
